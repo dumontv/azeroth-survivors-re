@@ -359,14 +359,16 @@ impl Plugin for PlayerPlugin {
         // The self-avatar fade shares the `MeshTag` and material channel with the interior
         // classifier and the appear and despawn fades, and writes `Visibility` for the
         // first-person hide, so it runs after them and the model-visibility set; off in capture
-        // mode, like the `control` whose alpha it reads.
+        // mode, except survival mode, whose top-down handoff releases the close-camera hide.
         .add_systems(
             Update,
             apply_self_model_fade
                 .after(benilla_world::interior::classify_entity_interior)
                 .after(benilla_world::model_fade::apply_render_fade)
                 .after(benilla_world::model_render::ModelVisSet)
-                .run_if(not(resource_exists::<crate::run_mode::CaptureMode>)),
+                .run_if(|capture: Option<Res<crate::run_mode::CaptureMode>>| {
+                    crate::survivors::active() || capture.is_none()
+                }),
         );
     }
 }

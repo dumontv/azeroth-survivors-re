@@ -41,10 +41,11 @@ minutes. **No server, no login, no account** — fully offline and self-containe
 - **Level-up cards** that deal in, tilt toward the cursor and lift on hover. Their WoW item-quality
   colour says how strong a pick is, and each card lists exactly what changes, like
   `Damage 20 » 26` or `Targets 2 » 3`.
-- **A class movement spell on F** from level 5, aimed at the cursor: Blink, Charge, Sprint, Dash,
+- **A class movement spell on F** from level 5 (cursor-aimed in top-down): Blink, Charge, Sprint, Dash,
   Fade, Ghost Wolf, Aspect of the Cheetah, Blessing of Freedom, Howl of Terror.
-- **A camera you can free:** locked top-down by default with the hero facing the cursor. **C**
-  unlocks it to swing and tilt, and the wheel zooms from over the shoulder out to 70 yards.
+- **Third-person by default**, with the original WoW interface and movement controller.
+  **F6**, or the view button beside the Escape menu, switches to the original top-down view.
+  Your view choice is remembered across runs.
 - A light sharpen-and-colour pass over the picture (**G** toggles it).
 
 ## Play it
@@ -70,9 +71,10 @@ Run `make` (or `make help`) to list every target.
 
 ## Controls
 
-See [CONTROLS.md](CONTROLS.md). The short version: **WASD** to move, **Space** to jump, **F**
-for your class's movement spell, the **mouse wheel** to zoom, **C** to unlock the camera, **Esc**
-to pause, **1/2/3** to pick a level-up card.
+See [CONTROLS.md](CONTROLS.md). The short version: **W/S** to move, **A/D** to turn,
+**Q/E** to strafe, **right mouse drag** to turn with the camera, and **Space** to jump.
+**F6** switches views, the **mouse wheel** zooms, **Esc** opens the pause menu,
+**F** uses your class movement spell, and **1/2/3** picks a level-up card.
 
 ## The game data (not in this repo)
 

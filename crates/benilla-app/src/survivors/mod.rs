@@ -1,8 +1,8 @@
-//! Warcraft Survivors: a top-down survival mode on the benilla world, started by
+//! Warcraft Survivors: a local survival mode on the benilla world, started by
 //! [`crate::run_survivors`]. There is no server: the hero, the enemies and the spells are local
 //! entities dressed by the same attach, animation and spell-visual systems a streamed unit gets,
-//! on a battleground picked at the menu ([`data::MAPS`]), with the player controller and FrameXML
-//! off ([`crate::run_mode::CaptureMode`]).
+//! on a battleground picked at the menu ([`data::MAPS`]). The stock WoW controller and FrameXML
+//! drive the default third-person view; the original top-down view remains optional.
 
 mod abilities;
 mod auto;
@@ -17,6 +17,11 @@ mod minimap;
 mod mobility;
 mod reference;
 mod units;
+mod view;
+mod view_rules;
+// Keep the FrameXML adapter in the UI feed layer, with access scoped to this game mode.
+#[path = "../ui_survivors.rs"]
+mod wow_ui;
 
 use benilla_world::schedule::WorldStage;
 use bevy::prelude::*;
@@ -38,7 +43,7 @@ pub(crate) struct SurvivorsPlugin;
 impl Plugin for SurvivorsPlugin {
     fn build(&self, app: &mut App) {
         reference::initialize();
-        // Present before `OnEnter(InWorld)`, where the UI lifecycle decides not to load FrameXML.
+        // Park the stock controller at the menu; FrameXML loads through the survival opt-in.
         app.insert_resource(crate::run_mode::CaptureMode)
             .add_plugins(grade::plugin)
             .init_state::<Phase>()
@@ -47,6 +52,8 @@ impl Plugin for SurvivorsPlugin {
             .init_resource::<Run>()
             .init_resource::<hero::CamRig>()
             .init_resource::<hero::AimPoint>()
+            .init_resource::<view::ViewOptions>()
+            .init_resource::<wow_ui::StockHudReady>()
             .init_resource::<abilities::PendingHits>()
             .init_resource::<enemies::Spawner>()
             .init_resource::<hud::Offer>()
@@ -55,6 +62,26 @@ impl Plugin for SurvivorsPlugin {
             .add_message::<enemies::Loot>()
             .add_plugins(bevy::ui_render::UiMaterialPlugin::<hud::SweepUiMaterial>::default())
             .add_systems(Startup, hud::setup_hud)
+            .add_systems(Startup, wow_ui::detach_status.after(hud::setup_hud))
+            .add_systems(Update, wow_ui::show_status.after(hud::show_panels))
+            .add_systems(
+                Update,
+                view::handoff
+                    .in_set(WorldStage::Input)
+                    .before(crate::player::PlayerControlSet),
+            )
+            .add_systems(
+                Update,
+                wow_ui::feed_player
+                    .in_set(crate::ui_script::UiFeed)
+                    .before(crate::ui_unit::UnitFeed),
+            )
+            .add_systems(
+                Update,
+                wow_ui::feed_hud
+                    .in_set(crate::ui_script::UiFeed)
+                    .after(crate::ui_action::CooldownEvents),
+            )
             .add_systems(Update, hero::daylight)
             .add_systems(
                 Update,
@@ -65,7 +92,8 @@ impl Plugin for SurvivorsPlugin {
                     hero::place_camera,
                 )
                     .chain()
-                    .in_set(WorldStage::Input),
+                    .in_set(WorldStage::Input)
+                    .after(crate::player::PlayerControlSet),
             )
             .add_systems(
                 Update,
@@ -83,6 +111,7 @@ impl Plugin for SurvivorsPlugin {
                     .chain()
                     .after(WorldStage::Input)
                     .run_if(in_state(Phase::Playing))
+                    .run_if(not(resource_exists::<view::Preview>))
                     // Entering a battleground raises its loading screen: the run waits behind it.
                     .run_if(|l: Res<crate::loading_screen::LoadingScreen>| !l.covering()),
             )
@@ -142,6 +171,9 @@ impl Plugin for SurvivorsPlugin {
                     auto::drive.after(hud::keys).before(hud::refresh_menu),
                 )
                 .add_systems(Update, auto::plan.before(WorldStage::Input));
+        }
+        if view::preview_from_env() {
+            app.add_systems(Update, view::enter_preview.after(hud::refresh_menu));
         }
     }
 }
