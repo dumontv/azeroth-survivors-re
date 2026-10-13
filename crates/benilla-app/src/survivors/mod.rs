@@ -15,6 +15,7 @@ mod hud;
 mod menu;
 mod minimap;
 mod mobility;
+mod reference;
 mod units;
 
 use benilla_world::schedule::WorldStage;
@@ -36,6 +37,7 @@ pub(crate) struct SurvivorsPlugin;
 
 impl Plugin for SurvivorsPlugin {
     fn build(&self, app: &mut App) {
+        reference::initialize();
         // Present before `OnEnter(InWorld)`, where the UI lifecycle decides not to load FrameXML.
         app.insert_resource(crate::run_mode::CaptureMode)
             .add_plugins(grade::plugin)
@@ -326,6 +328,7 @@ impl Run {
             7 | 11 | 3 | 4 => s.max_hp += 15.0,
             _ => s.speed += 0.5,
         }
+        s.max_hp = reference::health(self.class, s.max_hp);
         for &(p, level) in &self.passives {
             let v = p.per_level * f32::from(level);
             match p.stat {

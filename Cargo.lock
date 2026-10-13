@@ -628,6 +628,7 @@ dependencies = [
  "serde_json",
  "sha1 0.10.6",
  "smithay-clipboard",
+ "survivors-reference",
  "symphonia",
  "toml",
  "wasm-bindgen",
@@ -6538,6 +6539,14 @@ dependencies = [
  "quote",
  "rustversion",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "survivors-reference"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]
