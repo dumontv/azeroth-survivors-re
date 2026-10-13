@@ -363,7 +363,7 @@ impl Plugin for UiScriptPlugin {
 /// Whether a capture includes the player UI: world baselines stay UI-free unless
 /// [`crate::run_mode::capture_ui_opted_in`], which the UI load and window size also read.
 fn capture_ui_active(capture: Option<Res<crate::run_mode::CaptureMode>>) -> bool {
-    capture.is_some() && crate::run_mode::capture_ui_opted_in()
+    !crate::survivors::active() && capture.is_some() && crate::run_mode::capture_ui_opted_in()
 }
 
 /// `PointerOverUi = egui dev overlay ∨ player-UI hover`; the dev half is optional.

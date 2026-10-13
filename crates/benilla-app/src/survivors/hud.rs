@@ -1058,7 +1058,13 @@ pub(super) fn keys(
     mut selection: ResMut<Selection>,
     mut run: ResMut<Run>,
     mut next: ResMut<NextState<Phase>>,
+    stock: Res<super::wow_ui::StockHudReady>,
+    typing: Res<crate::ui_script::UiKeyboardCapture>,
 ) {
+    let stock = stock.0;
+    if typing.typing {
+        return;
+    }
     match phase.get() {
         Phase::Menu => {
             if keys.just_pressed(KeyCode::Enter) && start_run(&mut run, &mut selection) {
@@ -1066,12 +1072,12 @@ pub(super) fn keys(
             }
         }
         Phase::Playing => {
-            if keys.just_pressed(KeyCode::Escape) {
+            if !stock && keys.just_pressed(KeyCode::Escape) {
                 next.set(Phase::Paused);
             }
         }
         Phase::Paused => {
-            if keys.just_pressed(KeyCode::Escape) {
+            if !stock && keys.just_pressed(KeyCode::Escape) {
                 next.set(Phase::Playing);
             }
         }
@@ -2190,6 +2196,7 @@ pub(super) fn icon_tooltip(
 #[allow(clippy::type_complexity)]
 pub(super) fn show_panels(
     phase: Res<State<Phase>>,
+    stock: Res<super::wow_ui::StockHudReady>,
     mut roots: ParamSet<(
         Query<(&mut Visibility, &mut Node), With<MenuRoot>>,
         Query<(&mut Visibility, &mut Node), With<HudRoot>>,
@@ -2199,6 +2206,7 @@ pub(super) fn show_panels(
     )>,
 ) {
     let p = *phase.get();
+    let stock = stock.0;
     // A hidden panel leaves the layout too: a merely invisible button still takes clicks.
     let set = |(mut v, mut node): (Mut<Visibility>, Mut<Node>), on: bool| {
         let want = if on {
@@ -2218,13 +2226,13 @@ pub(super) fn show_panels(
         set(root, p == Phase::Menu);
     }
     for root in &mut roots.p1() {
-        set(root, p != Phase::Menu && p != Phase::GameOver);
+        set(root, !stock && p != Phase::Menu && p != Phase::GameOver);
     }
     for root in &mut roots.p2() {
         set(root, p == Phase::LevelUp);
     }
     for root in &mut roots.p3() {
-        set(root, p == Phase::Paused);
+        set(root, !stock && p == Phase::Paused);
     }
     for root in &mut roots.p4() {
         set(root, p == Phase::GameOver);

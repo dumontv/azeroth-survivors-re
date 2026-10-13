@@ -2,11 +2,13 @@
 
 use benilla_world::view::WorldCamera;
 use benilla_world::world_point::WorldPoint;
-use bevy::input::mouse::{AccumulatedMouseMotion, MouseScrollUnit, MouseWheel};
+use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 
 use super::data::{self, ClassDef};
 use super::units::{self, flat, wow_to_bevy, yaw_toward, Fx, Marks, UnitSpec};
+use super::view::ViewOptions;
+use super::view_rules::ViewMode;
 use super::{Phase, Run, Selection};
 use crate::creature_anim::{move_flags, MovementState};
 use crate::net::{FieldChanged, Guid, ObjectStore};
@@ -29,26 +31,11 @@ pub(super) const HERO_RADIUS: f32 = 0.7;
 const JUMP_SPEED: f32 = 7.955_547;
 const GRAVITY: f32 = 19.291_105;
 
-/// Radians of orbit per raw mouse unit while right-dragging.
-const ORBIT_RATE: f32 = 0.008;
-/// Elevation clamp (radians): ~10°..~83° above the horizon, so the camera never dives underground.
-const PITCH_MIN: f32 = 0.18;
-const PITCH_MAX: f32 = 1.45;
 /// The locked view's tilt.
 const FIXED_PITCH: f32 = 61.0 * std::f32::consts::PI / 180.0;
 /// Wheel zoom range, yards from the hero's shoulders.
 const ZOOM_MIN: f32 = 1.5;
 const ZOOM_MAX: f32 = 70.0;
-
-/// Whether the camera is locked; `C` toggles it.
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub(super) enum CamMode {
-    /// Locked top-down (58°), laptop-friendly — the original feel.
-    #[default]
-    Fixed,
-    /// Unlocked: a mouse drag swings and tilts it around the hero.
-    Orbit,
-}
 
 #[derive(Resource)]
 pub(super) struct CamRig {
@@ -58,7 +45,6 @@ pub(super) struct CamRig {
     pub yaw: f32,
     /// Elevation above the horizon (radians), clamped so the camera never dives underground.
     pub pitch: f32,
-    pub mode: CamMode,
 }
 
 impl Default for CamRig {
@@ -68,7 +54,6 @@ impl Default for CamRig {
             orbit: 0.6,
             yaw: 0.0,
             pitch: FIXED_PITCH,
-            mode: CamMode::Fixed,
         }
     }
 }
@@ -125,6 +110,23 @@ pub(super) fn spawn_hero(
     commands
         .entity(e)
         .insert((Hero { vy: 0.0, air: 0.0 }, Marks::buffs()));
+    commands.entity(e).insert((
+        // A player GUID lets the stock name and unit resolvers identify the local hero.
+        Guid(serial),
+        crate::net::SelfPlayer,
+        crate::net::UnitSpeeds(benilla_protocol::MoveSpeeds::default()),
+    ));
+    commands.entity(e).queue(move |mut entity: EntityWorldMut| {
+        if let Some(mut store) = entity.get_mut::<ObjectStore>() {
+            store
+                .0
+                .merge(benilla_protocol::messages::ObjectFields::from_pairs(&[
+                    (0, serial as u32),
+                    (1, (serial >> 32) as u32),
+                    (2, 0x19),
+                ]));
+        }
+    });
     e
 }
 
@@ -191,13 +193,18 @@ pub(super) fn drive_hero(
     phase: Res<State<Phase>>,
     run: Res<Run>,
     selection: Res<Selection>,
-    rig: Res<CamRig>,
+    options: Res<ViewOptions>,
     aim: Res<AimPoint>,
+    typing: Res<crate::ui_script::UiKeyboardCapture>,
     world: WorldPoint,
     auto: Option<Res<super::auto::Auto>>,
     mut player: ResMut<crate::player::Player>,
     mut hero: Query<(&mut Transform, &mut MovementState, &mut Hero)>,
 ) {
+    // The stock WoW controller owns movement, collision, swimming, jumping and the camera here.
+    if options.mode == ViewMode::ThirdPerson && *phase.get() != Phase::Menu {
+        return;
+    }
     let focus = match hero.single_mut() {
         Ok((mut tf, mut mv, mut hm)) => {
             let dt = time.delta_secs();
@@ -207,7 +214,7 @@ pub(super) fn drive_hero(
                 .filter(|_| *phase.get() == Phase::Playing && run.dead_t.is_none())
             {
                 dir = super::auto::steer(auto);
-            } else if *phase.get() == Phase::Playing && run.dead_t.is_none() {
+            } else if *phase.get() == Phase::Playing && run.dead_t.is_none() && !typing.typing {
                 if keys.any_pressed([KeyCode::KeyW, KeyCode::ArrowUp]) {
                     dir.z -= 1.0;
                 }
@@ -220,23 +227,14 @@ pub(super) fn drive_hero(
                 if keys.any_pressed([KeyCode::KeyD, KeyCode::ArrowRight]) {
                     dir.x += 1.0;
                 }
-                // In orbit mode WASD is camera-relative; in fixed mode it stays world-relative.
-                if rig.mode == CamMode::Orbit {
-                    let (sy, cy) = rig.yaw.sin_cos();
-                    dir = Vec3::new(dir.x * cy + dir.z * sy, 0.0, dir.z * cy - dir.x * sy);
-                }
             }
             let mut pos = tf.translation;
-            // Locked, the hero faces the cursor and WASD moves him under it, so he backpedals and
-            // strafes as a player does; unlocked (or driven), he faces where he runs.
-            let face = (rig.mode == CamMode::Fixed
-                && auto.is_none()
-                && *phase.get() == Phase::Playing
-                && run.dead_t.is_none())
-            .then(|| aim.0.map(|a| flat(a - pos)))
-            .flatten()
-            .filter(|d| d.length() > 0.5)
-            .map(|d| d.normalize());
+            // In top-down mode the hero faces the cursor; movement keeps its original WASD axes.
+            let face = (auto.is_none() && *phase.get() == Phase::Playing && run.dead_t.is_none())
+                .then(|| aim.0.map(|a| flat(a - pos)))
+                .flatten()
+                .filter(|d| d.length() > 0.5)
+                .map(|d| d.normalize());
             if let Some(look) = face {
                 let target = Quat::from_rotation_y(yaw_toward(look));
                 tf.rotation = tf.rotation.slerp(target, (dt * 20.0).min(1.0));
@@ -272,7 +270,12 @@ pub(super) fn drive_hero(
             let ground = world.terrain_height_under(pos).unwrap_or(pos.y);
             let playing = *phase.get() == Phase::Playing && run.dead_t.is_none();
             // Space hops: lift off the terrain, then gravity brings the hero back down.
-            if playing && keys.just_pressed(KeyCode::Space) && hm.vy == 0.0 && hm.air == 0.0 {
+            if playing
+                && !typing.typing
+                && keys.just_pressed(KeyCode::Space)
+                && hm.vy == 0.0
+                && hm.air == 0.0
+            {
                 hm.vy = JUMP_SPEED;
             }
             if playing && (hm.vy != 0.0 || hm.air > 0.0) {
@@ -314,37 +317,30 @@ pub(super) fn drive_hero(
     player.pos = focus;
 }
 
-/// A slow orbit at the menu; in play, top-down until `C` unlocks it to swing and tilt.
+/// A slow orbit at the menu, and the optional top-down view during play.
 pub(super) fn place_camera(
     time: Res<Time<Real>>,
     phase: Res<State<Phase>>,
     mut rig: ResMut<CamRig>,
     mut wheel: MessageReader<MouseWheel>,
-    mouse: Res<ButtonInput<MouseButton>>,
-    motion: Res<AccumulatedMouseMotion>,
-    keys: Res<ButtonInput<KeyCode>>,
+    options: Res<ViewOptions>,
+    hover: Res<crate::ui_script::PlayerUiHover>,
     player: Res<crate::player::Player>,
     world: WorldPoint,
     hero: Query<&Transform, (With<Hero>, Without<WorldCamera>)>,
     mut cams: Query<&mut Transform, With<WorldCamera>>,
 ) {
-    // `C` unlocks the camera to swing and tilt; locking it again snaps back to the top-down view,
-    // so world-relative WASD lines up with the screen again.
-    if keys.just_pressed(KeyCode::KeyC) {
-        rig.mode = match rig.mode {
-            CamMode::Fixed => CamMode::Orbit,
-            CamMode::Orbit => {
-                rig.yaw = 0.0;
-                rig.pitch = FIXED_PITCH;
-                CamMode::Fixed
-            }
-        };
+    if options.mode == ViewMode::ThirdPerson && *phase.get() != Phase::Menu {
+        return;
     }
     // With no hero yet, the focus `drive_hero` grounded.
     let focus = hero.single().map_or(player.pos, |t| t.translation);
     // Multiplicative, so a notch moves as far by eye close in as far out; all the way down to an
     // over-the-shoulder view.
     for w in wheel.read() {
+        if *phase.get() != Phase::Playing || hover.0.is_some() {
+            continue;
+        }
         let notches = match w.unit {
             MouseScrollUnit::Line => w.y,
             MouseScrollUnit::Pixel => w.y * 0.02,
@@ -359,12 +355,6 @@ pub(super) fn place_camera(
             focus + Vec3::Y * 1.1,
         )
     } else {
-        // Unlocked, either mouse button drags the camera around the hero, as in WoW.
-        if rig.mode == CamMode::Orbit && mouse.any_pressed([MouseButton::Left, MouseButton::Right])
-        {
-            rig.yaw -= motion.delta.x * ORBIT_RATE;
-            rig.pitch = (rig.pitch + motion.delta.y * ORBIT_RATE).clamp(PITCH_MIN, PITCH_MAX);
-        }
         let (sy, cy) = rig.yaw.sin_cos();
         let (sp, cp) = rig.pitch.sin_cos();
         let look = focus + Vec3::Y * 1.4;

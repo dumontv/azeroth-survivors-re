@@ -182,13 +182,20 @@ pub(super) fn cast_mobility(
     selection: Res<super::Selection>,
     aim: Res<hero::AimPoint>,
     mut fx: Fx,
+    typing: Res<crate::ui_script::UiKeyboardCapture>,
+    mut player: ResMut<crate::player::Player>,
+    options: Res<super::view::ViewOptions>,
 ) {
     let dt = time.delta_secs();
     let m = &mut run.mobile;
     m.cd = (m.cd - dt).max(0.0);
     m.haste_t = (m.haste_t - dt).max(0.0);
     m.vanish_t = (m.vanish_t - dt).max(0.0);
-    if *phase.get() != Phase::Playing || run.dead_t.is_some() || !keys.just_pressed(KEY) {
+    if *phase.get() != Phase::Playing
+        || run.dead_t.is_some()
+        || typing.typing
+        || !keys.just_pressed(KEY)
+    {
         return;
     }
     let Some(def) = run.mobility() else { return };
@@ -201,8 +208,11 @@ pub(super) fn cast_mobility(
     let pos = tf.translation;
     let facing = tf.rotation * Vec3::NEG_Z;
     let facing = flat(facing).normalize_or(Vec3::NEG_Z);
-    // Aimed at the cursor where there is one, else straight ahead.
-    let cursor = aim.0.filter(|a| flat(*a - pos).length() > 0.5);
+    // WoW movement spells follow the hero's facing; retain cursor aiming in top-down mode.
+    let cursor = (options.mode == super::view_rules::ViewMode::TopDown)
+        .then_some(aim.0)
+        .flatten()
+        .filter(|a| flat(*a - pos).length() > 0.5);
     let toward = cursor.map_or(facing, |a| flat(a - pos).normalize());
     // Keep any jump inside the battleground's leash.
     let map = selection.map_def();
@@ -273,6 +283,10 @@ pub(super) fn cast_mobility(
                 }
             }
         }
+    }
+    if tf.translation != pos {
+        player.pos = tf.translation;
+        player.reseat = true;
     }
     run.mobile.cd = def.cooldown;
 }

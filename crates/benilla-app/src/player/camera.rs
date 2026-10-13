@@ -580,6 +580,19 @@ impl CameraControl {
         self.look.is_some()
     }
 
+    /// Release mouse-look when a local game mode parks this controller.
+    pub(crate) fn suspend_look(&mut self, cursor: &mut CursorOptions, reveal_avatar: bool) {
+        self.look = None;
+        self.freelook = false;
+        self.world_mouse = WorldMouse::default();
+        self.cursor_stash = None;
+        self.cursor_released = true;
+        if reveal_avatar {
+            self.self_fade_alpha = 1.0;
+        }
+        release_cursor(cursor);
+    }
+
     /// True while a look session holds the OS cursor, hidden and locked: looking, and focused.
     /// Read by the macOS cursor hide, the one platform that hides the cursor itself.
     #[cfg(any(target_os = "macos", test))]
