@@ -16,10 +16,6 @@ dev = ["benilla-assets/dev", "benilla-formats/dev", "benilla-world/dev", "dep:be
 tracy = ["bevy/trace_tracy"]
 # Writes every system's per-run span to `trace-<ts>.json` in the cwd.
 trace_chrome = ["bevy/trace_chrome"]
-# Browser render backend, forwarded from `wenilla` (see benilla-world's note on why the world
-# needs WebGPU).
-webgl2 = ["bevy/webgl2", "benilla-world/webgl2"]
-webgpu = ["bevy/webgpu", "benilla-world/webgpu"]
 
 [dependencies]
 # Wall-clock reads (`SystemTime::now`) go through `web-time`: a re-export of std's on native, and
@@ -163,6 +159,3 @@ windows-sys = { version = "0.59", features = [
 benilla-srp = { path = "../benilla-srp" }
 num-bigint = "0.4.6"
 sha1.workspace = true
-# tests/boot_manifest.rs parses web/boot-manifest.json (the boot-prefetch read-set). Dev-only:
-# the 0978 decision to keep serde_json out of the shipped app stands.
-serde_json = "1"

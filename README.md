@@ -15,7 +15,7 @@ from-scratch WoW 1.12.1 client engine (Rust + [Bevy](https://bevy.org)).**
 > **Aethus** — play the original in the browser at **[wow.aethus.pl](https://wow.aethus.pl/)**
 > ([r/wowservers announcement](https://www.reddit.com/r/wowservers/comments/1x0yidl/azeroth_survivors_roguelike_wow_singleplayer_game/)
 > · [Discord](https://discord.gg/UzxaZuSAk)). This repository is a from-source local build of the
-> game, running on the [benilla](#how-its-built) / [wenilla](#how-its-built) engine, for personal use.
+> game, running natively on the [benilla](#how-its-built) engine, for personal use.
 
 Pick a class and a battleground, then survive: WASD to move, your abilities cast themselves,
 enemies swarm in waves, you level up and pick upgrades, and a boss shows up every couple of
@@ -51,23 +51,30 @@ minutes. **No server, no login, no account** — fully offline and self-containe
 ## Play it
 
 ```bash
-git clone https://github.com/OutThisLife/azeroth-survivors-re
+git clone https://github.com/dumontv/azeroth-survivors-re
 cd azeroth-survivors-re
-make build     # fetch game data + install toolchain + build the wasm (~5.5 GB download)
-make start     # → open http://127.0.0.1:8090/
+make build     # fetch missing game data and build the native desktop game
+make start     # launch the desktop game
 ```
 
-`make build` chains three re-runnable scripts, each skipping what's already done:
+`make native` builds and launches in one command. `scripts/setup.sh` also prepares a fresh
+clone. Plain `cargo build --release` builds the native game, the workspace's default package.
+For code changes when the game data is already present, run `scripts/native-build.sh`.
 
-| Step | What it does |
-| --- | --- |
-| `scripts/fetch-data.sh` | downloads the WoW 1.12.1 client and extracts its MPQs |
-| `scripts/web-setup.sh` | installs the wasm toolchain (wasi-sdk, wasm-bindgen, binaryen) |
-| `scripts/web-build.sh` | builds the client into `web/dist/` |
+**Prerequisites:** Rust (rustup uses `rust-toolchain.toml`), a C compiler, `pkg-config`, `make`,
+and `curl`/`unzip` for the optional game-data download. Linux also needs ALSA, udev, Wayland,
+and xkbcommon development libraries (`libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev`
+on Debian/Ubuntu). In Fish, load a new rustup installation with `source ~/.cargo/env.fish`.
 
-**Prerequisites:** [Rust](https://rustup.rs/), `make`, `curl`, `unzip`.
+Use existing game data without downloading it:
 
-Run `make` (or `make help`) to list every target.
+```bash
+make build WOW_DATA=/path/to/WoW/Data
+make start WOW_DATA=/path/to/WoW/Data
+```
+
+`make clean` removes Rust build output and preserves game data and local settings.
+Run `make help` to list every target.
 
 ## Controls
 
@@ -84,7 +91,7 @@ FrameXML. The game reads a WoW 1.12.1 client's `Data` folder at runtime, which y
 `make build` (via `scripts/fetch-data.sh`) downloads the **English WoW 1.12.1 (build 5875)**
 client from [archive.org](https://archive.org/details/WoW_1.12.1-5875) (~5.5 GB) and extracts the
 MPQs into `wow-data/Data/` (git-ignored, resumable, skipped when already present). Or point at a
-client you already have with `--data` / `WOW_DATA`.
+client you already have with `WOW_DATA`.
 
 ### Changing the download source
 
@@ -101,11 +108,11 @@ Or set it permanently by editing the single clearly-marked `DEFAULT_DATA_URL` li
 
 ## How it's built
 
-The survivors mode is `crates/benilla-app/src/survivors/`, running on two upstream projects:
-
-- [benilla](https://github.com/samwhosung/benilla) — a from-scratch WoW 1.12.1 client.
-- [wenilla](https://github.com/Arnesen/wenilla) — benilla compiled to WebAssembly, with a local
-  host and realm service.
+The native launcher is `crates/warcraft-survivors/`; survival gameplay lives in
+`crates/benilla-app/src/survivors/`. The engine is based on
+[benilla](https://github.com/samwhosung/benilla), through the
+[open-source reconstruction](https://github.com/OutThisLife/azeroth-survivors-re) and its wenilla
+ancestry. This fork builds and tests the native desktop game only.
 
 ## Legal
 

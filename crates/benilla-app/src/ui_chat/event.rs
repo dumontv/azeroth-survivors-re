@@ -324,8 +324,7 @@ pub(crate) struct ChatEvent {
     pub channel_base: String,
     pub notice: String,
     /// The speaker's guid for a wire line (`SMSG_MESSAGECHAT`'s sender), `0` for everything
-    /// else. Not a script arg: the web bridge (`crate::webbridge`) relays it so a page feature can
-    /// find the speaker among the streamed units.
+    /// else. Preserved as wire metadata; not one of the stock Lua event arguments.
     pub sender_guid: u64,
     /// Our slot's state for this channel as the notice arrived (`None`: no slot), set before
     /// [`super::feed::deliver`] changes it: the reference's notice arms read `slot+0x9c` for the

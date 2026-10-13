@@ -120,6 +120,7 @@ field() { grep -m1 "^$2" "$1" 2>/dev/null | sed -E "s/^$2[[:space:]]*=[[:space:]
   done
   echo
 
-} > docs/MAP.md
+# Module lists are space-joined; normalize their trailing separator in the generated Markdown.
+} | sed 's/[[:blank:]]*$//' > docs/MAP.md
 
 echo "genmap: wrote docs/MAP.md"

@@ -16,14 +16,13 @@ python crates/warcraft-survivors/tools/inspect_original.py /path/to/AzerothSurvi
 mkdir -p benilla-config
 cp out/original-analysis/survivors-reference.toml benilla-config/
 source ~/.cargo/env.fish
-env CARGO_BUILD_JOBS=8 make wasm
+env CARGO_BUILD_JOBS=8 scripts/native-build.sh
 make start
 ```
 
-The browser loads the optional profile before initializing WebAssembly. A native dev build reads
-the same profile from its own `benilla-config/`. Release builds without the `dev` feature use the
-state folder beside their executable, or the `BENILLA_HOME` override. Restart after importing or
-changing a profile. Browser hosting through `wenilla-realm` has no profile-loading integration.
+A native dev build reads the profile from its own `benilla-config/`. Builds without the `dev`
+feature use the state folder beside their executable, or the `BENILLA_HOME` override. Restart
+after importing or changing a profile.
 
 ## Evidence and limits
 
@@ -52,16 +51,14 @@ calling visual or gameplay fidelity verified.
 
 ## Verification
 
-The browser helper tests require Node.js; the other inspection tests use Python's standard
-library. Use the desktop app's bundled Node executable if Node is not on the shell's PATH.
+The inspection tests use Python's standard library; profile validation uses Rust.
 
 ```fish
 python -m unittest discover -s crates/warcraft-survivors/tools -p 'test_*.py'
-node --test web/reference-profile.test.mjs
 cargo test -p survivors-reference
 cargo run -p survivors-reference --example validate -- benilla-config/survivors-reference.toml
 ```
 
 To return to the fork's defaults, move `benilla-config/survivors-reference.toml` outside the state
-folder, rebuild the browser bundle and restart the game. No original save or installation file
+folder and restart the native game. No original save or installation file
 is modified by the importer.
