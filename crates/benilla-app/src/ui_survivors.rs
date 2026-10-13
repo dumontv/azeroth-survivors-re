@@ -123,6 +123,8 @@ pub(super) fn feed_hud(
     mut ready: ResMut<StockHudReady>,
     pending: Option<Res<crate::ui_script::PendingEntryUiLoad>>,
 ) {
+    // This survival-only feed must update readiness even before the interface exists. Its own
+    // menu flags can only be consumed below, after the completed-entry and stock-widget guards.
     ready.0 = pending.is_none()
         && script
             .as_ref()

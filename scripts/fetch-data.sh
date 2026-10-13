@@ -4,12 +4,22 @@
 # the MPQs are extracted.
 #
 # Re-runnable: skips when the MPQs are already present, and resumes an interrupted download.
-# Requires: curl, unzip.
+# WOW_DATA may point to an existing Data folder instead of downloading.
+# Requires: curl, unzip when downloading.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${WOW_DATA_DIR:-$ROOT/wow-data}"
 DATA="$DATA_DIR/Data"
+
+if [ -n "${WOW_DATA:-}" ]; then
+    if [ -f "$WOW_DATA/terrain.MPQ" ] && [ -f "$WOW_DATA/patch.MPQ" ]; then
+        echo "using existing game data at $WOW_DATA"
+        exit 0
+    fi
+    echo "WOW_DATA must name a WoW 1.12.1 Data folder containing terrain.MPQ and patch.MPQ: $WOW_DATA" >&2
+    exit 1
+fi
 
 # --- Data source ---------------------------------------------------------------
 # Where the game data is downloaded from. Override per-run by setting WOW_DATA_URL, or edit the

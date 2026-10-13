@@ -84,32 +84,7 @@ struct ZoneSignal {
     indoor: bool,
 }
 
-/// The resolved zone texts as a resource: what [`feed_zone_events`] hands the VM, for a host-side
-/// reader that is not Lua (the web bridge, `crate::webbridge`). Written only when a resolve
-/// publishes, so it holds the last published state and `is_changed` marks a real transition.
-#[derive(Resource, Default, Clone, PartialEq, Debug)]
-pub(crate) struct ZoneInfo {
-    /// The zone row's id (the leaf's single-hop parent, or the leaf itself).
-    pub(crate) zone_id: u32,
-    /// `GetZoneText()` — the zone name, or the whole-WMO override indoors.
-    pub(crate) zone_text: String,
-    /// `GetRealZoneText()` — the zone row's own name, never overridden.
-    pub(crate) real_zone_text: String,
-    /// `GetSubZoneText()`.
-    pub(crate) subzone_text: String,
-    /// `GetMinimapZoneText()` — subzone, else zone.
-    pub(crate) minimap_text: String,
-    pub(crate) indoor: bool,
-    /// `GetZonePVPInfo()`'s type: `friendly` / `hostile` / `contested`, or empty on structural
-    /// failure (the reference's nil).
-    pub(crate) pvp_type: &'static str,
-    /// …and its faction name (`FactionGroup.dbc`), empty when unowned.
-    pub(crate) pvp_faction: String,
-    pub(crate) arena: bool,
-}
-
-/// The set [`feed_zone_events`] runs in — after the VM tick and the leaf authority (see the
-/// plugin); named so a reader of [`ZoneInfo`] can order itself after the write.
+/// The zone-event feed, after the VM tick and the leaf authority.
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ZoneFeed;
 
@@ -137,7 +112,6 @@ fn feed_zone_events(
     factions: Option<Res<Factions>>,
     self_store: Query<&ObjectStore, With<SelfPlayer>>,
     mut cache: Local<crate::ui_script::VmMemo<ZoneCache>>,
-    mut info: ResMut<ZoneInfo>,
 ) {
     let (Some(mut script), Some(areas)) = (script, areas) else {
         return;
@@ -245,19 +219,6 @@ fn feed_zone_events(
         });
     let pvp_type = pvp.map_or("", |(ty, _)| ty);
 
-    // The same publish, for the host-side reader ([`ZoneInfo`]); `set_if_neq` so a minimap-only
-    // re-resolve is not a spurious transition.
-    info.set_if_neq(ZoneInfo {
-        zone_id: signal.zone_id,
-        zone_text: signal.zone_text.clone(),
-        real_zone_text: real_zone_text.clone(),
-        subzone_text: signal.subzone_text.clone(),
-        minimap_text: minimap_text.clone(),
-        indoor: signal.indoor,
-        pvp_type,
-        pvp_faction: pvp.map_or("", |(_, f)| f).to_string(),
-        arena: is_arena,
-    });
     script.set_zone_texts(benilla_ui::script::ZoneTexts {
         zone: signal.zone_text.clone(),
         real_zone: real_zone_text,
@@ -295,8 +256,7 @@ pub(crate) struct AreaPlugin;
 
 impl Plugin for AreaPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ZoneInfo>()
-            .add_systems(Startup, load_area_table.after(AssetSet::Open))
+        app.add_systems(Startup, load_area_table.after(AssetSet::Open))
             .add_systems(
                 Update,
                 // After the leaf authority: leaf, indoor bit and names must come from one frame,
