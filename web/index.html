@@ -69,6 +69,7 @@
   import init from './wenilla.js';
   import { bind } from './wasi_stubs.js';
   import { boot } from './boot.js';
+  import { loadReferenceProfile } from './reference-profile.mjs';
   // `boot(init)` is the loading overlay + parallel data prefetch (see boot.js's header); it calls
   // `init()` with a byte-counted Response, and `init()` instantiates the wasm module, which runs
   // `#[wasm_bindgen(start)] start()` as part of instantiation (`wenilla/src/lib.rs`) — that's the
@@ -92,6 +93,7 @@
       }
     })
     .catch((e) => console.warn('bridge.js:', e));
+  await loadReferenceProfile(window.__wenilla_env);
   const w = await boot(init);
   bind(w.memory);
 </script>

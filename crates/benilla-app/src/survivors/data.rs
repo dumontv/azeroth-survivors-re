@@ -73,6 +73,7 @@ pub(crate) enum Effect {
     Execute(f32),
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct AbilityDef {
     pub key: &'static str,
     pub spell: u32,

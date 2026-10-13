@@ -917,7 +917,7 @@ pub(super) fn start_run(run: &mut Run, selection: &mut Selection) -> bool {
         ..Run::default()
     };
     run.abilities.push(Owned {
-        def: data::ability(class.start),
+        def: super::reference::starting_ability(class),
         level: 1,
         cd: 0.5,
     });

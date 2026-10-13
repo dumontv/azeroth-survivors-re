@@ -1,0 +1,13 @@
+[package]
+name = "survivors-reference"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Validated, locally supplied reference profiles for the survivors mode"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
